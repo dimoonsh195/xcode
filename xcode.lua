@@ -97,24 +97,40 @@ local function makeHeaderBtn(text, xOffset, width)
     return btn
 end
 
--- Кнопки справа налево, с промежутками
-local btnSettings  = makeHeaderBtn("Settings",   -70,  62)
-local btnHelp      = makeHeaderBtn("Help",       -138, 58)
-local btnSelectAll = makeHeaderBtn("Select All", -206, 76)
-local btnSave      = makeHeaderBtn("Save",       -274, 54)
-local btnClearCode = makeHeaderBtn("Clear Code", -362, 80)
-local btnClearOut  = makeHeaderBtn("Clear Out",  -450, 80)
-local btnExecute   = makeHeaderBtn("Execute",    -512, 54)
+-- Кнопки справа налево
+local btnHelp      = makeHeaderBtn("Help",       -70,  54)
+local btnSettings  = makeHeaderBtn("Settings",   -132, 62)
+local btnEditor    = makeHeaderBtn("Editor",     -194, 58)
+local btnSelectAll = makeHeaderBtn("Select All", -262, 76)
+local btnSave      = makeHeaderBtn("Save",       -330, 54)
+local btnClearCode = makeHeaderBtn("Clear Code", -418, 80)
+local btnClearOut  = makeHeaderBtn("Clear Out",  -506, 80)
+local btnExecute   = makeHeaderBtn("Execute",    -568, 54)
 
 -- ==========================================================
--- EDITOR
+-- CONTENT AREA (вкладки живут здесь, одинаковый размер)
 -- ==========================================================
+local contentFrame = Instance.new("Frame")
+contentFrame.Size = UDim2.new(1, -20, 1, -84)
+contentFrame.Position = UDim2.new(0, 10, 0, 37)
+contentFrame.BackgroundTransparency = 1
+contentFrame.Parent = xWin
+
+-- ==========================================================
+-- TAB: EDITOR (левая часть) + OUTPUT (правая) — внутри contentFrame
+-- ==========================================================
+local tabEditor = Instance.new("Frame")
+tabEditor.Size = UDim2.new(1, 0, 1, 0)
+tabEditor.BackgroundTransparency = 1
+tabEditor.Visible = true
+tabEditor.Parent = contentFrame
+
 local editorContainer = Instance.new("Frame")
-editorContainer.Size = UDim2.new(0.6, -15, 1, -84)
-editorContainer.Position = UDim2.new(0, 10, 0, 37)
+editorContainer.Size = UDim2.new(0.6, -5, 1, 0)
+editorContainer.Position = UDim2.new(0, 0, 0, 0)
 editorContainer.BackgroundColor3 = T().editorBg
 editorContainer.BorderSizePixel = 0
-editorContainer.Parent = xWin
+editorContainer.Parent = tabEditor
 Instance.new("UICorner", editorContainer).CornerRadius = UDim.new(0, 4)
 
 local editorScroll = Instance.new("ScrollingFrame")
@@ -152,15 +168,12 @@ codeBox.MultiLine = true
 codeBox.TextWrapped = true
 codeBox.Parent = editorScroll
 
--- ==========================================================
--- OUTPUT
--- ==========================================================
 local outputContainer = Instance.new("Frame")
-outputContainer.Size = UDim2.new(0.4, -15, 1, -84)
-outputContainer.Position = UDim2.new(0.6, 5, 0, 37)
+outputContainer.Size = UDim2.new(0.4, -5, 1, 0)
+outputContainer.Position = UDim2.new(0.6, 5, 0, 0)
 outputContainer.BackgroundColor3 = T().outputBg
 outputContainer.BorderSizePixel = 0
-outputContainer.Parent = xWin
+outputContainer.Parent = tabEditor
 Instance.new("UICorner", outputContainer).CornerRadius = UDim.new(0, 4)
 
 local outputLabel = Instance.new("TextLabel")
@@ -223,6 +236,203 @@ local logConnection = LogService.MessageOut:Connect(function(message, messageTyp
 end)
 
 -- ==========================================================
+-- TAB: SETTINGS (та же область)
+-- ==========================================================
+local tabSettings = Instance.new("Frame")
+tabSettings.Size = UDim2.new(1, 0, 1, 0)
+tabSettings.BackgroundColor3 = T().bg
+tabSettings.BorderSizePixel = 0
+tabSettings.Visible = false
+tabSettings.Parent = contentFrame
+Instance.new("UICorner", tabSettings).CornerRadius = UDim.new(0, 4)
+
+local settingsScroll = Instance.new("ScrollingFrame")
+settingsScroll.Size = UDim2.new(1, 0, 1, 0)
+settingsScroll.BackgroundTransparency = 1
+settingsScroll.BorderSizePixel = 0
+settingsScroll.ScrollBarThickness = 6
+settingsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+settingsScroll.Parent = tabSettings
+local sLayout = Instance.new("UIListLayout", settingsScroll)
+sLayout.Padding = UDim.new(0, 4)
+sLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local function makeSettingBtn(text, callback)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(1, -20, 0, 28)
+    b.BackgroundColor3 = T().btn
+    b.Text = "  " .. text
+    b.TextColor3 = T().btnText
+    b.Font = Enum.Font.Code
+    b.TextSize = 12
+    b.TextXAlignment = Enum.TextXAlignment.Left
+    b.BorderSizePixel = 0
+    b.Parent = settingsScroll
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+    b.MouseButton1Click:Connect(callback)
+    return b
+end
+
+local function getCurrentLine()
+    local text = codeBox.Text
+    local cursor = codeBox.CursorPosition or 1
+    local before = text:sub(1, cursor - 1)
+    local startPos = (before:find("\n[^\n]*$") or 0) + 1
+    local endPos = (text:find("\n", cursor) or (#text + 1)) - 1
+    return startPos, endPos, text:sub(startPos, endPos)
+end
+
+makeSettingBtn("Theme: Dark / Light", function()
+    CurrentTheme = (CurrentTheme == "Dark") and "Light" or "Dark"
+    applyTheme()
+end)
+makeSettingBtn("Font color: White", function() FontColor = Color3.fromRGB(255,255,255); applyTheme() end)
+makeSettingBtn("Font color: Black", function() FontColor = Color3.fromRGB(0,0,0); applyTheme() end)
+makeSettingBtn("Font color: Green", function() FontColor = Color3.fromRGB(120,255,120); applyTheme() end)
+makeSettingBtn("Font color: Cyan", function() FontColor = Color3.fromRGB(120,220,255); applyTheme() end)
+makeSettingBtn("Font color: Default", function() FontColor = nil; applyTheme() end)
+makeSettingBtn("Font size: cycle 12 / 14 / 16", function()
+    FontSize = (FontSize == 12) and 14 or ((FontSize == 14) and 16 or 12)
+    applyTheme()
+end)
+makeSettingBtn("Format Indent (whole code)", function()
+    local INDENT = "    "
+    local lines = {}
+    for line in codeBox.Text:gmatch("([^\n]*)\n?") do table.insert(lines, line) end
+    local lvl = 0
+    local out = {}
+    for _, line in ipairs(lines) do
+        local trimmed = line:match("^%s*(.-)%s*$")
+        if trimmed:match("^end") or trimmed:match("^else") or trimmed:match("^elseif") or trimmed:match("^until") then
+            lvl = math.max(0, lvl - 1)
+        end
+        if trimmed ~= "" then table.insert(out, string.rep(INDENT, lvl) .. trimmed)
+        else table.insert(out, "") end
+        if trimmed:match("then%s*$") or trimmed:match("do%s*$") or trimmed:match("function%s*%(") or trimmed:match("repeat%s*$") then
+            lvl = lvl + 1
+        end
+    end
+    codeBox.Text = table.concat(out, "\n")
+end)
+makeSettingBtn("Duplicate Line", function()
+    local s, e, line = getCurrentLine()
+    codeBox.Text = codeBox.Text:sub(1, e) .. "\n" .. line .. codeBox.Text:sub(e + 1)
+end)
+makeSettingBtn("Delete Line", function()
+    local s, e = getCurrentLine()
+    local text = codeBox.Text
+    local removeEnd = (text:sub(e + 1, e + 1) == "\n") and e + 1 or e
+    codeBox.Text = text:sub(1, s - 1) .. text:sub(removeEnd + 1)
+end)
+makeSettingBtn("Comment / Uncomment Line", function()
+    local s, e, line = getCurrentLine()
+    local text = codeBox.Text
+    if line:match("^%s*%-%-") then
+        codeBox.Text = text:sub(1, s - 1) .. line:gsub("^(%s*)%-%-%s?", "%1", 1) .. text:sub(e + 1)
+    else
+        codeBox.Text = text:sub(1, s - 1) .. line:gsub("^(%s*)", "%1-- ", 1) .. text:sub(e + 1)
+    end
+end)
+makeSettingBtn("Uppercase (all)", function() codeBox.Text = codeBox.Text:upper() end)
+makeSettingBtn("Lowercase (all)", function() codeBox.Text = codeBox.Text:lower() end)
+makeSettingBtn("Copy All to Clipboard", function()
+    if setclipboard then setclipboard(codeBox.Text) end
+end)
+makeSettingBtn("Paste from Clipboard", function()
+    if getclipboard then codeBox.Text = codeBox.Text .. getclipboard() end
+end)
+makeSettingBtn("Save File (writefile)", function()
+    if type(writefile) == "function" then pcall(writefile, "Xcode_Script.lua", codeBox.Text) end
+end)
+makeSettingBtn("Load File (readfile)", function()
+    if type(readfile) == "function" then
+        local ok, data = pcall(readfile, "Xcode_Script.lua")
+        if ok and data then codeBox.Text = data end
+    end
+end)
+
+-- ==========================================================
+-- TAB: HELP (та же область, English)
+-- ==========================================================
+local tabHelp = Instance.new("Frame")
+tabHelp.Size = UDim2.new(1, 0, 1, 0)
+tabHelp.BackgroundColor3 = T().bg
+tabHelp.BorderSizePixel = 0
+tabHelp.Visible = false
+tabHelp.Parent = contentFrame
+Instance.new("UICorner", tabHelp).CornerRadius = UDim.new(0, 4)
+
+local helpScroll = Instance.new("ScrollingFrame")
+helpScroll.Size = UDim2.new(1, 0, 1, 0)
+helpScroll.BackgroundTransparency = 1
+helpScroll.BorderSizePixel = 0
+helpScroll.ScrollBarThickness = 6
+helpScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+helpScroll.Parent = tabHelp
+local hLayout = Instance.new("UIListLayout", helpScroll)
+hLayout.Padding = UDim.new(0, 2)
+
+local helpData = {
+    { "local", "declares a local variable" },
+    { "=", "assignment (set value)" },
+    { "==", "equality comparison" },
+    { "~=", "not equal" },
+    { ">", "greater than" },
+    { "<", "less than" },
+    { ">=", "greater or equal" },
+    { "<=", "less or equal" },
+    { "nil", "no value / empty" },
+    { "true", "boolean true" },
+    { "false", "boolean false" },
+    { "\"text\"", "string (text in quotes)" },
+    { "123", "number" },
+    { "if ... then", "if condition is true, run block" },
+    { "elseif ... then", "else if another condition is true" },
+    { "else", "otherwise" },
+    { "end", "closes if/for/while/function" },
+    { "and", "logical AND" },
+    { "or", "logical OR" },
+    { "not", "logical NOT" },
+    { "for i = 1, 10 do", "loop i from 1 to 10" },
+    { "while cond do", "loop while condition is true" },
+    { "do", "starts a loop/block body" },
+    { "break", "exit the loop" },
+    { "function", "declare a function" },
+    { "return", "return a value from function" },
+    { "print(...)", "print to output" },
+    { "{ }", "table (list or dictionary)" },
+    { "#table", "length of a table" },
+    { "table[1]", "first element of a table" },
+    { "table.key", "element by name" },
+    { "-- text", "single-line comment" },
+    { "--[[ text ]]", "multi-line comment" },
+}
+for _, pair in ipairs(helpData) do
+    local row = Instance.new("TextLabel")
+    row.Size = UDim2.new(1, -20, 0, 20)
+    row.BackgroundTransparency = 1
+    row.Text = "  " .. pair[1] .. "  —  " .. pair[2]
+    row.TextColor3 = fontColor()
+    row.Font = Enum.Font.Code
+    row.TextSize = 12
+    row.TextXAlignment = Enum.TextXAlignment.Left
+    row.Parent = helpScroll
+end
+
+-- ==========================================================
+-- TAB SWITCHING
+-- ==========================================================
+local function showTab(name)
+    tabEditor.Visible = (name == "editor")
+    tabSettings.Visible = (name == "settings")
+    tabHelp.Visible = (name == "help")
+end
+
+btnEditor.MouseButton1Click:Connect(function() showTab("editor") end)
+btnSettings.MouseButton1Click:Connect(function() showTab("settings") end)
+btnHelp.MouseButton1Click:Connect(function() showTab("help") end)
+
+-- ==========================================================
 -- HINT BAR (short labels)
 -- ==========================================================
 local hintBar = Instance.new("Frame")
@@ -278,13 +488,9 @@ local function updateHint()
     local indent = #(line:match("^(%s*)") or "")
     local label = "0"
     if trimmed == "" then label = "0"
-    elseif trimmed:match("^end") or trimmed:match("^else") or trimmed:match("^elseif") or trimmed:match("^until") then
-        label = "-4"
-    elseif trimmed:match("then%s*$") or trimmed:match("do%s*$") or trimmed:match("function%s*%(") or trimmed:match("function%s+%w+%s*%(") then
-        label = "+4 (end)"
-    elseif trimmed:match("repeat%s*$") or trimmed:match("{%s*$") then
-        label = "+4"
-    end
+    elseif trimmed:match("^end") or trimmed:match("^else") or trimmed:match("^elseif") or trimmed:match("^until") then label = "-4"
+    elseif trimmed:match("then%s*$") or trimmed:match("do%s*$") or trimmed:match("function%s*%(") or trimmed:match("function%s+%w+%s*%(") then label = "+4 (end)"
+    elseif trimmed:match("repeat%s*$") or trimmed:match("{%s*$") then label = "+4" end
     hintLabel.Text = label .. "   |   current: " .. indent
 end
 
@@ -297,12 +503,14 @@ end)
 -- ==========================================================
 -- APPLY THEME
 -- ==========================================================
-local function applyTheme()
+function applyTheme()
     xWin.BackgroundColor3 = T().bg
     xHeader.BackgroundColor3 = T().header
     xTitle.TextColor3 = T().btnText
     editorContainer.BackgroundColor3 = T().editorBg
     outputContainer.BackgroundColor3 = T().outputBg
+    tabSettings.BackgroundColor3 = T().bg
+    tabHelp.BackgroundColor3 = T().bg
     lineNumbers.TextColor3 = T().lineNum
     codeBox.TextColor3 = fontColor()
     codeBox.TextSize = FontSize
@@ -311,10 +519,13 @@ local function applyTheme()
     hintBar.BackgroundColor3 = T().header
     hintLabel.TextColor3 = fontColor()
     for _, btn in ipairs(xHeader:GetChildren()) do
-        if btn:IsA("TextButton") then
-            btn.BackgroundColor3 = T().btn
-            btn.TextColor3 = T().btnText
-        end
+        if btn:IsA("TextButton") then btn.BackgroundColor3 = T().btn; btn.TextColor3 = T().btnText end
+    end
+    for _, btn in ipairs(settingsScroll:GetChildren()) do
+        if btn:IsA("TextButton") then btn.BackgroundColor3 = T().btn; btn.TextColor3 = T().btnText end
+    end
+    for _, lbl in ipairs(helpScroll:GetChildren()) do
+        if lbl:IsA("TextLabel") then lbl.TextColor3 = fontColor() end
     end
     for _, lbl in ipairs(outputScroll:GetChildren()) do
         if lbl:IsA("TextLabel") then
@@ -326,291 +537,6 @@ local function applyTheme()
     end
     updateEditorVisuals()
 end
-
--- ==========================================================
--- SETTINGS PANEL (10+ functions)
--- ==========================================================
-local settingsFrame = Instance.new("Frame")
-settingsFrame.Size = UDim2.new(0, 280, 0, 440)
-settingsFrame.Position = UDim2.new(0.5, -140, 0.5, -220)
-settingsFrame.BackgroundColor3 = T().header
-settingsFrame.Visible = false
-settingsFrame.ZIndex = 100
-settingsFrame.Parent = xGui
-Instance.new("UICorner", settingsFrame).CornerRadius = UDim.new(0, 6)
-local sStroke = Instance.new("UIStroke", settingsFrame)
-sStroke.Color = T().accent
-
-local sTitle = Instance.new("TextLabel")
-sTitle.Size = UDim2.new(1, -30, 0, 24)
-sTitle.Position = UDim2.new(0, 5, 0, 5)
-sTitle.BackgroundTransparency = 1
-sTitle.Text = "Settings"
-sTitle.TextColor3 = fontColor()
-sTitle.Font = Enum.Font.Code
-sTitle.TextSize = 14
-sTitle.Parent = settingsFrame
-
-local settingsScroll = Instance.new("ScrollingFrame")
-settingsScroll.Size = UDim2.new(1, -10, 1, -35)
-settingsScroll.Position = UDim2.new(0, 5, 0, 30)
-settingsScroll.BackgroundTransparency = 1
-settingsScroll.BorderSizePixel = 0
-settingsScroll.ScrollBarThickness = 6
-settingsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-settingsScroll.Parent = settingsFrame
-local sLayout = Instance.new("UIListLayout", settingsScroll)
-sLayout.Padding = UDim.new(0, 4)
-sLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-local function makeSettingBtn(text, callback)
-    local b = Instance.new("TextButton")
-    b.Size = UDim2.new(1, -10, 0, 26)
-    b.BackgroundColor3 = T().btn
-    b.Text = text
-    b.TextColor3 = T().btnText
-    b.Font = Enum.Font.Code
-    b.TextSize = 12
-    b.BorderSizePixel = 0
-    b.Parent = settingsScroll
-    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
-    b.MouseButton1Click:Connect(callback)
-    return b
-end
-
--- helper: работа с текущей строкой
-local function getCurrentLine()
-    local text = codeBox.Text
-    local cursor = codeBox.CursorPosition or 1
-    local before = text:sub(1, cursor - 1)
-    local startPos = (before:find("\n[^\n]*$") or 0) + 1
-    local endPos = (text:find("\n", cursor) or (#text + 1)) - 1
-    return startPos, endPos, text:sub(startPos, endPos)
-end
-
--- 1. Тема
-makeSettingBtn("Theme: Dark / Light", function()
-    CurrentTheme = (CurrentTheme == "Dark") and "Light" or "Dark"
-    settingsFrame.BackgroundColor3 = T().header
-    sStroke.Color = T().accent
-    sTitle.TextColor3 = fontColor()
-    applyTheme()
-end)
-
--- 2-6. Цвета шрифта
-makeSettingBtn("Font color: White", function() FontColor = Color3.fromRGB(255,255,255); applyTheme() end)
-makeSettingBtn("Font color: Black", function() FontColor = Color3.fromRGB(0,0,0); applyTheme() end)
-makeSettingBtn("Font color: Green", function() FontColor = Color3.fromRGB(120,255,120); applyTheme() end)
-makeSettingBtn("Font color: Cyan", function() FontColor = Color3.fromRGB(120,220,255); applyTheme() end)
-makeSettingBtn("Font color: Default", function() FontColor = nil; applyTheme() end)
-
--- 7. Размер шрифта
-makeSettingBtn("Font size: cycle 12/14/16", function()
-    FontSize = (FontSize == 12) and 14 or ((FontSize == 14) and 16 or 12)
-    applyTheme()
-end)
-
--- 8. Format Indent (для всего кода)
-makeSettingBtn("Format Indent (whole code)", function()
-    local INDENT = "    "
-    local lines = {}
-    for line in codeBox.Text:gmatch("([^\n]*)\n?") do table.insert(lines, line) end
-    local lvl = 0
-    local out = {}
-    for _, line in ipairs(lines) do
-        local trimmed = line:match("^%s*(.-)%s*$")
-        if trimmed:match("^end") or trimmed:match("^else") or trimmed:match("^elseif") or trimmed:match("^until") then
-            lvl = math.max(0, lvl - 1)
-        end
-        if trimmed ~= "" then
-            table.insert(out, string.rep(INDENT, lvl) .. trimmed)
-        else
-            table.insert(out, "")
-        end
-        if trimmed:match("then%s*$") or trimmed:match("do%s*$") or trimmed:match("function%s*%(") or trimmed:match("repeat%s*$") then
-            lvl = lvl + 1
-        end
-    end
-    codeBox.Text = table.concat(out, "\n")
-end)
-
--- 9. Duplicate Line
-makeSettingBtn("Duplicate Line", function()
-    local s, e, line = getCurrentLine()
-    local text = codeBox.Text
-    codeBox.Text = text:sub(1, e) .. "\n" .. line .. text:sub(e + 1)
-end)
-
--- 10. Delete Line
-makeSettingBtn("Delete Line", function()
-    local s, e, line = getCurrentLine()
-    local text = codeBox.Text
-    local removeEnd = (text:sub(e + 1, e + 1) == "\n") and e + 1 or e
-    codeBox.Text = text:sub(1, s - 1) .. text:sub(removeEnd + 1)
-end)
-
--- 11. Comment / Uncomment
-makeSettingBtn("Comment / Uncomment Line", function()
-    local s, e, line = getCurrentLine()
-    local text = codeBox.Text
-    if line:match("^%s*%-%-") then
-        local newLine = line:gsub("^(%s*)%-%-%s?", "%1", 1)
-        codeBox.Text = text:sub(1, s - 1) .. newLine .. text:sub(e + 1)
-    else
-        local newLine = line:gsub("^(%s*)", "%1-- ", 1)
-        codeBox.Text = text:sub(1, s - 1) .. newLine .. text:sub(e + 1)
-    end
-end)
-
--- 12. Uppercase selected/all
-makeSettingBtn("Uppercase (all)", function()
-    codeBox.Text = codeBox.Text:upper()
-end)
-
--- 13. Lowercase selected/all
-makeSettingBtn("Lowercase (all)", function()
-    codeBox.Text = codeBox.Text:lower()
-end)
-
--- 14. Copy All
-makeSettingBtn("Copy All to Clipboard", function()
-    if setclipboard then setclipboard(codeBox.Text); addOutput("Copied to clipboard", T().accent)
-    else addOutput("setclipboard unavailable", Color3.fromRGB(255,100,100)) end
-end)
-
--- 15. Paste
-makeSettingBtn("Paste from Clipboard", function()
-    if getclipboard then codeBox.Text = codeBox.Text .. getclipboard()
-    else addOutput("getclipboard unavailable", Color3.fromRGB(255,100,100)) end
-end)
-
--- 16. Save to file
-makeSettingBtn("Save File (writefile)", function()
-    if type(writefile) == "function" then
-        local ok, err = pcall(function() writefile("Xcode_Script.lua", codeBox.Text) end)
-        if ok then addOutput("Saved Xcode_Script.lua", T().accent)
-        else addOutput("Save error: " .. tostring(err), Color3.fromRGB(255,100,100)) end
-    else addOutput("writefile unavailable", Color3.fromRGB(255,100,100)) end
-end)
-
--- 17. Load from file
-makeSettingBtn("Load File (readfile)", function()
-    if type(readfile) == "function" then
-        local ok, data = pcall(readfile, "Xcode_Script.lua")
-        if ok and data then codeBox.Text = data; addOutput("Loaded Xcode_Script.lua", T().accent)
-        else addOutput("Load error: " .. tostring(data), Color3.fromRGB(255,100,100)) end
-    else addOutput("readfile unavailable", Color3.fromRGB(255,100,100)) end
-end)
-
-local closeSettings = Instance.new("TextButton")
-closeSettings.Size = UDim2.new(0, 24, 0, 24)
-closeSettings.Position = UDim2.new(1, -28, 0, 4)
-closeSettings.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-closeSettings.Text = "X"
-closeSettings.TextColor3 = Color3.new(1,1,1)
-closeSettings.Font = Enum.Font.Code
-closeSettings.TextSize = 12
-closeSettings.BorderSizePixel = 0
-closeSettings.ZIndex = 101
-closeSettings.Parent = settingsFrame
-Instance.new("UICorner", closeSettings).CornerRadius = UDim.new(0, 4)
-closeSettings.MouseButton1Click:Connect(function() settingsFrame.Visible = false end)
-
--- ==========================================================
--- HELP PANEL (English)
--- ==========================================================
-local helpFrame = Instance.new("Frame")
-helpFrame.Size = UDim2.new(0, 420, 0, 420)
-helpFrame.Position = UDim2.new(0.5, -210, 0.5, -210)
-helpFrame.BackgroundColor3 = T().header
-helpFrame.Visible = false
-helpFrame.ZIndex = 100
-helpFrame.Parent = xGui
-Instance.new("UICorner", helpFrame).CornerRadius = UDim.new(0, 6)
-local hStroke = Instance.new("UIStroke", helpFrame); hStroke.Color = T().accent
-
-local hTitle = Instance.new("TextLabel")
-hTitle.Size = UDim2.new(1, -30, 0, 24)
-hTitle.Position = UDim2.new(0, 5, 0, 5)
-hTitle.BackgroundTransparency = 1
-hTitle.Text = "Help — Lua keywords"
-hTitle.TextColor3 = fontColor()
-hTitle.Font = Enum.Font.Code
-hTitle.TextSize = 14
-hTitle.Parent = helpFrame
-
-local helpScroll = Instance.new("ScrollingFrame")
-helpScroll.Size = UDim2.new(1, -10, 1, -35)
-helpScroll.Position = UDim2.new(0, 5, 0, 30)
-helpScroll.BackgroundTransparency = 1
-helpScroll.BorderSizePixel = 0
-helpScroll.ScrollBarThickness = 6
-helpScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-helpScroll.Parent = helpFrame
-local hLayout = Instance.new("UIListLayout", helpScroll)
-hLayout.Padding = UDim.new(0, 2)
-
-local helpData = {
-    { "local", "declares a local variable" },
-    { "=", "assignment (set value)" },
-    { "==", "equality comparison" },
-    { "~=", "not equal" },
-    { ">", "greater than" },
-    { "<", "less than" },
-    { ">=", "greater or equal" },
-    { "<=", "less or equal" },
-    { "nil", "no value / empty" },
-    { "true", "boolean true" },
-    { "false", "boolean false" },
-    { "\"text\"", "string (text in quotes)" },
-    { "123", "number" },
-    { "if ... then", "if condition is true, run block" },
-    { "elseif ... then", "else if another condition is true" },
-    { "else", "otherwise" },
-    { "end", "closes if/for/while/function" },
-    { "and", "logical AND" },
-    { "or", "logical OR" },
-    { "not", "logical NOT" },
-    { "for i = 1, 10 do", "loop i from 1 to 10" },
-    { "while cond do", "loop while condition is true" },
-    { "do", "starts a loop/block body" },
-    { "break", "exit the loop" },
-    { "function", "declare a function" },
-    { "return", "return a value from function" },
-    { "print(...)", "print to output" },
-    { "{ }", "table (list or dictionary)" },
-    { "#table", "length of a table" },
-    { "table[1]", "first element of a table" },
-    { "table.key", "element by name" },
-    { "-- text", "single-line comment" },
-    { "--[[ text ]]", "multi-line comment" },
-}
-for _, pair in ipairs(helpData) do
-    local row = Instance.new("TextLabel")
-    row.Size = UDim2.new(1, -10, 0, 20)
-    row.BackgroundTransparency = 1
-    row.Text = pair[1] .. "  —  " .. pair[2]
-    row.TextColor3 = fontColor()
-    row.Font = Enum.Font.Code
-    row.TextSize = 12
-    row.TextXAlignment = Enum.TextXAlignment.Left
-    row.Parent = helpScroll
-end
-helpScroll.CanvasSize = UDim2.new(0, 0, 0, hLayout.AbsoluteContentSize.Y + 10)
-
-local closeHelp = Instance.new("TextButton")
-closeHelp.Size = UDim2.new(0, 24, 0, 24)
-closeHelp.Position = UDim2.new(1, -28, 0, 4)
-closeHelp.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-closeHelp.Text = "X"
-closeHelp.TextColor3 = Color3.new(1,1,1)
-closeHelp.Font = Enum.Font.Code
-closeHelp.TextSize = 12
-closeHelp.BorderSizePixel = 0
-closeHelp.ZIndex = 101
-closeHelp.Parent = helpFrame
-Instance.new("UICorner", closeHelp).CornerRadius = UDim.new(0, 4)
-closeHelp.MouseButton1Click:Connect(function() helpFrame.Visible = false end)
 
 -- ==========================================================
 -- BUTTON HANDLERS
@@ -642,9 +568,6 @@ btnSave.MouseButton1Click:Connect(function()
         if not ok then addOutput("Save error: " .. tostring(err), Color3.fromRGB(255, 100, 100)) end
     else addOutput("writefile недоступен", Color3.fromRGB(255, 100, 100)) end
 end)
-
-btnSettings.MouseButton1Click:Connect(function() settingsFrame.Visible = not settingsFrame.Visible end)
-btnHelp.MouseButton1Click:Connect(function() helpFrame.Visible = not helpFrame.Visible end)
 
 -- ==========================================================
 -- RESIZE
@@ -683,7 +606,7 @@ UIS.InputEnded:Connect(function(input)
 end)
 
 -- ==========================================================
--- START CODE
+-- START
 -- ==========================================================
 codeBox.Text = [==[--- XCODE ---
 local a = 1
@@ -695,5 +618,11 @@ else
     print("test2")
 end
 ]==]
+-- даём layout'ам обновиться, затем ставим CanvasSize
+task.defer(function()
+    settingsScroll.CanvasSize = UDim2.new(0, 0, 0, sLayout.AbsoluteContentSize.Y + 10)
+    helpScroll.CanvasSize = UDim2.new(0, 0, 0, hLayout.AbsoluteContentSize.Y + 10)
+end)
 updateEditorVisuals()
 updateHint()
+showTab("editor")
