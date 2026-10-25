@@ -110,6 +110,101 @@ codeBox.MultiLine = true
 codeBox.TextWrapped = true
 codeBox.Parent = editorScroll
 
+-- ==========================================
+-- ЛОГИКА АВТООТСТУПОВ И АВТОЗАКРЫТИЯ БЛОКОВ
+-- ==========================================
+
+local INDENT = "    " -- 4 пробела
+local indentLevel = 0
+
+-- Функция для вычисления отступа текущей строки
+local function getCurrentLineIndent(text, cursorPos)
+    local beforeCursor = text:sub(1, cursorPos - 1)
+    local lineStart = beforeCursor:find("\n[^\n]*$") or 0
+    local line = beforeCursor:sub(lineStart + 1)
+    local spaces = line:match("^(%s*)")
+    return #spaces, line
+end
+
+-- Обработчик нажатия Enter в TextBox
+codeBox.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Return then
+        local text = codeBox.Text
+        local cursor = codeBox.CursorPosition
+        
+        -- Получаем текущую строку и её отступ
+        local currentIndent, currentLine = getCurrentLineIndent(text, cursor)
+        local trimmedLine = currentLine:match("^%s*(.-)%s*$")
+        
+        -- Определяем, нужно ли увеличить отступ
+        local increaseIndent = false
+        local autoCloseEnd = false
+        
+        -- Проверяем ключевые слова, после которых нужен отступ
+        if trimmedLine:match("then%s*$") or 
+           trimmedLine:match("do%s*$") or 
+           trimmedLine:match("function%s*%(") or
+           trimmedLine:match("function%s+%w+%s*%(") or
+           trimmedLine:match("repeat%s*$") or
+           trimmedLine:match("{%s*$") then
+            increaseIndent = true
+        end
+        
+        -- Определяем, нужно ли автоматически закрыть блок
+        if trimmedLine:match("then%s*$") or 
+           trimmedLine:match("do%s*$") or 
+           trimmedLine:match("function%s*%(") or
+           trimmedLine:match("function%s+%w+%s*%(") then
+            autoCloseEnd = true
+        end
+        
+        -- Проверяем, не является ли текущая строка закрывающей
+        local isClosing = trimmedLine:match("^end") or 
+                          trimmedLine:match("^else") or 
+                          trimmedLine:match("^elseif") or 
+                          trimmedLine:match("^until") or
+                          trimmedLine:match("^}")
+        
+        -- Вычисляем новый отступ
+        local newIndent = currentIndent
+        if isClosing and currentIndent >= #INDENT then
+            newIndent = currentIndent - #INDENT
+        elseif increaseIndent then
+            newIndent = currentIndent + #INDENT
+        end
+        
+        -- Формируем текст для вставки
+        local insertText = "\n" .. string.rep(" ", newIndent)
+        
+        -- Если нужно автозакрытие, добавляем end и ставим курсор между ними
+        if autoCloseEnd then
+            local closeIndent = currentIndent
+            insertText = insertText .. "\n" .. string.rep(" ", closeIndent) .. "end"
+        end
+        
+        -- Вставляем текст
+        local before = text:sub(1, cursor - 1)
+        local after = text:sub(cursor)
+        codeBox.Text = before .. insertText .. after
+        
+        -- Позиционируем курсор
+        if autoCloseEnd then
+            -- Курсор должен быть между новой строкой и end
+            local newCursor = cursor + #insertText - #("\n" .. string.rep(" ", currentIndent) .. "end")
+            codeBox.CursorPosition = newCursor
+        else
+            codeBox.CursorPosition = cursor + #insertText
+        end
+        
+        -- Обновляем визуал
+        updateEditorVisuals()
+    end
+end)
+
+-- ==========================================
+-- ОБНОВЛЕНИЕ ВИЗУАЛА
+-- ==========================================
+
 local function updateEditorVisuals()
     local text = codeBox.Text
     local lines = {}
@@ -138,6 +233,10 @@ codeBox:GetPropertyChangedSignal("Text"):Connect(updateEditorVisuals)
 editorScroll:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
     lineNumbers.Position = UDim2.new(0, 5, 0, -editorScroll.CanvasPosition.Y)
 end)
+
+-- ==========================================
+-- КНОПКИ
+-- ==========================================
 
 btnExecute.MouseButton1Click:Connect(function()
     local success, err = pcall(function()
@@ -170,6 +269,10 @@ btnSave.MouseButton1Click:Connect(function()
         warn("[Xcode] writefile is not available")
     end
 end)
+
+-- ==========================================
+-- РЕСАЙЗ
+-- ==========================================
 
 local xResize = Instance.new("TextButton")
 xResize.Size = UDim2.new(0, 16, 0, 16)
@@ -205,6 +308,10 @@ end)
 UIS.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then xResizing = false end
 end)
+
+-- ==========================================
+-- СТАРТОВЫЙ КОД
+-- ==========================================
 
 codeBox.Text = [[local xcode = (100 - 99)
 if xcode == 1 then
