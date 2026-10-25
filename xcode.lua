@@ -28,8 +28,8 @@ xGui.DisplayOrder = 6000
 xGui.Parent = guiParent
 
 local xWin = Instance.new("Frame")
-xWin.Size = UDim2.new(0, 700, 0, 450)
-xWin.Position = UDim2.new(0.5, -350, 0.5, -225)
+xWin.Size = UDim2.new(0, 700, 0, 480) -- чуть выше, чтобы влезла подсказка
+xWin.Position = UDim2.new(0.5, -350, 0.5, -240)
 xWin.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 xWin.BorderSizePixel = 0
 xWin.Active = true
@@ -54,7 +54,7 @@ xTitle.TextSize = 14
 xTitle.TextXAlignment = Enum.TextXAlignment.Left
 xTitle.Parent = xHeader
 
-local function makeBtn(text, xOffset, width)
+local function makeBtn(text, xOffset, width, parent)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0, width, 0, 22)
     btn.Position = UDim2.new(1, xOffset, 0, 4)
@@ -63,7 +63,7 @@ local function makeBtn(text, xOffset, width)
     btn.TextColor3 = Color3.fromRGB(200, 200, 200)
     btn.Font = Enum.Font.Code
     btn.TextSize = 12
-    btn.Parent = xHeader
+    btn.Parent = parent or xHeader
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
     return btn
 end
@@ -73,8 +73,12 @@ local btnClear = makeBtn("Clear", -170, 50)
 local btnSelectAll = makeBtn("Select All", -110, 70)
 local btnSave = makeBtn("Save", -30, 50)
 
+-- === НОВЫЕ КНОПКИ ДЛЯ ОТСТУПОВ ===
+local btnIndent = makeBtn("Indent", -320, 55)
+local btnDedent = makeBtn("Dedent", -380, 55)
+
 local editorScroll = Instance.new("ScrollingFrame")
-editorScroll.Size = UDim2.new(1, -20, 1, -60)
+editorScroll.Size = UDim2.new(1, -20, 1, -95) -- уменьшил высоту, чтобы влезла подсказка
 editorScroll.Position = UDim2.new(0, 10, 0, 35)
 editorScroll.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 editorScroll.BorderSizePixel = 0
@@ -111,100 +115,153 @@ codeBox.TextWrapped = true
 codeBox.Parent = editorScroll
 
 -- ==========================================
--- ЛОГИКА АВТООТСТУПОВ И АВТОЗАКРЫТИЯ БЛОКОВ
+-- ПАНЕЛЬ ПОДСКАЗКИ ВНИЗУ
 -- ==========================================
+local hintBar = Instance.new("Frame")
+hintBar.Size = UDim2.new(1, -20, 0, 40)
+hintBar.Position = UDim2.new(0, 10, 1, -50)
+hintBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+hintBar.BorderSizePixel = 0
+hintBar.Parent = xWin
+Instance.new("UICorner", hintBar).CornerRadius = UDim.new(0, 4)
 
-local INDENT = "    " -- 4 пробела
-local indentLevel = 0
+local hintLabel = Instance.new("TextLabel")
+hintLabel.Size = UDim2.new(1, -20, 1, 0)
+hintLabel.Position = UDim2.new(0, 10, 0, 0)
+hintLabel.BackgroundTransparency = 1
+hintLabel.Text = "Подсказка: Enter после then/do/function — ставь +4 пробела"
+hintLabel.TextColor3 = Color3.fromRGB(180, 220, 180)
+hintLabel.Font = Enum.Font.Code
+hintLabel.TextSize = 12
+hintLabel.TextXAlignment = Enum.TextXAlignment.Left
+hintLabel.TextYAlignment = Enum.TextYAlignment.Center
+hintLabel.TextWrapped = true
+hintLabel.Parent = hintBar
 
--- Функция для вычисления отступа текущей строки
-local function getCurrentLineIndent(text, cursorPos)
+-- ==========================================
+-- АНАЛИЗ СТРОКИ И ПОДСКАЗКИ
+-- ==========================================
+local function getLineInfo(text, cursorPos)
+    if not text or cursorPos < 1 then return 0, "", "" end
     local beforeCursor = text:sub(1, cursorPos - 1)
     local lineStart = beforeCursor:find("\n[^\n]*$") or 0
-    local line = beforeCursor:sub(lineStart + 1)
-    local spaces = line:match("^(%s*)")
-    return #spaces, line
+    local lineEnd = text:find("\n", cursorPos) or (#text + 1)
+    local line = text:sub(lineStart + 1, lineEnd - 1)
+    local trimmed = line:match("^%s*(.-)%s*$")
+    local leadingSpaces = line:match("^(%s*)")
+    return #leadingSpaces, trimmed, line
 end
 
--- Обработчик нажатия Enter в TextBox
-codeBox.InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.Return then
-        local text = codeBox.Text
-        local cursor = codeBox.CursorPosition
-        
-        -- Получаем текущую строку и её отступ
-        local currentIndent, currentLine = getCurrentLineIndent(text, cursor)
-        local trimmedLine = currentLine:match("^%s*(.-)%s*$")
-        
-        -- Определяем, нужно ли увеличить отступ
-        local increaseIndent = false
-        local autoCloseEnd = false
-        
-        -- Проверяем ключевые слова, после которых нужен отступ
-        if trimmedLine:match("then%s*$") or 
-           trimmedLine:match("do%s*$") or 
-           trimmedLine:match("function%s*%(") or
-           trimmedLine:match("function%s+%w+%s*%(") or
-           trimmedLine:match("repeat%s*$") or
-           trimmedLine:match("{%s*$") then
-            increaseIndent = true
-        end
-        
-        -- Определяем, нужно ли автоматически закрыть блок
-        if trimmedLine:match("then%s*$") or 
-           trimmedLine:match("do%s*$") or 
-           trimmedLine:match("function%s*%(") or
-           trimmedLine:match("function%s+%w+%s*%(") then
-            autoCloseEnd = true
-        end
-        
-        -- Проверяем, не является ли текущая строка закрывающей
-        local isClosing = trimmedLine:match("^end") or 
-                          trimmedLine:match("^else") or 
-                          trimmedLine:match("^elseif") or 
-                          trimmedLine:match("^until") or
-                          trimmedLine:match("^}")
-        
-        -- Вычисляем новый отступ
-        local newIndent = currentIndent
-        if isClosing and currentIndent >= #INDENT then
-            newIndent = currentIndent - #INDENT
-        elseif increaseIndent then
-            newIndent = currentIndent + #INDENT
-        end
-        
-        -- Формируем текст для вставки
-        local insertText = "\n" .. string.rep(" ", newIndent)
-        
-        -- Если нужно автозакрытие, добавляем end и ставим курсор между ними
-        if autoCloseEnd then
-            local closeIndent = currentIndent
-            insertText = insertText .. "\n" .. string.rep(" ", closeIndent) .. "end"
-        end
-        
-        -- Вставляем текст
-        local before = text:sub(1, cursor - 1)
-        local after = text:sub(cursor)
-        codeBox.Text = before .. insertText .. after
-        
-        -- Позиционируем курсор
-        if autoCloseEnd then
-            -- Курсор должен быть между новой строкой и end
-            local newCursor = cursor + #insertText - #("\n" .. string.rep(" ", currentIndent) .. "end")
-            codeBox.CursorPosition = newCursor
-        else
-            codeBox.CursorPosition = cursor + #insertText
-        end
-        
-        -- Обновляем визуал
-        updateEditorVisuals()
+local function analyzeLine(text, cursorPos)
+    local indent, trimmed, fullLine = getLineInfo(text, cursorPos)
+    
+    -- Пустая строка
+    if trimmed == "" then
+        return "Пустая строка — отступ 0 (или выровняй с блоком выше)", indent, "empty"
+    end
+    
+    -- Строка начинается с закрывающего блока
+    if trimmed:match("^end") then
+        return "Строка с 'end' — отступ должен быть как у открывающего блока (обычно -4 пробела)", indent, "close"
+    end
+    if trimmed:match("^else") then
+        return "Строка с 'else' — отступ как у 'if' (обычно -4 пробела)", indent, "close"
+    end
+    if trimmed:match("^elseif") then
+        return "Строка с 'elseif' — отступ как у 'if' (обычно -4 пробела)", indent, "close"
+    end
+    if trimmed:match("^until") then
+        return "Строка с 'until' — отступ как у 'repeat' (обычно -4 пробела)", indent, "close"
+    end
+    
+    -- Строка открывает блок
+    if trimmed:match("then%s*$") then
+        return "После 'then' — новая строка с отступом +4 пробела", indent, "open"
+    end
+    if trimmed:match("do%s*$") then
+        return "После 'do' — новая строка с отступом +4 пробела", indent, "open"
+    end
+    if trimmed:match("function%s*%(") then
+        return "После 'function' — новая строка с отступом +4 пробела", indent, "open"
+    end
+    if trimmed:match("repeat%s*$") then
+        return "После 'repeat' — новая строка с отступом +4 пробела", indent, "open"
+    end
+    if trimmed:match("{%s*$") then
+        return "После '{' — новая строка с отступом +4 пробела", indent, "open"
+    end
+    
+    -- Обычная строка
+    return "Обычная строка — отступ " .. indent .. " (можно продолжить без изменений)", indent, "normal"
+end
+
+-- Обновление подсказки при изменении текста или позиции курсора
+local function updateHint()
+    if not codeBox:IsFocused() and codeBox.CursorPosition == 1 and #codeBox.Text == 0 then
+        hintLabel.Text = "Подсказка: Enter после then/do/function — ставь +4 пробела"
+        hintLabel.TextColor3 = Color3.fromRGB(180, 220, 180)
+        return
+    end
+    
+    local cursor = codeBox.CursorPosition or 1
+    local hint, indent, type = analyzeLine(codeBox.Text, cursor)
+    
+    -- Меняем цвет в зависимости от типа
+    if type == "open" then
+        hintLabel.TextColor3 = Color3.fromRGB(180, 220, 255) -- синеватый
+    elseif type == "close" then
+        hintLabel.TextColor3 = Color3.fromRGB(255, 180, 180) -- красноватый
+    elseif type == "empty" then
+        hintLabel.TextColor3 = Color3.fromRGB(200, 200, 200) -- серый
+    else
+        hintLabel.TextColor3 = Color3.fromRGB(180, 220, 180) -- зелёный
+    end
+    
+    hintLabel.Text = hint .. " | Текущий отступ: " .. indent .. " пробел(ов)"
+end
+
+codeBox:GetPropertyChangedSignal("Text"):Connect(updateHint)
+codeBox:GetPropertyChangedSignal("CursorPosition"):Connect(updateHint)
+
+-- ==========================================
+-- КНОПКИ INDENT / DEDENT
+-- ==========================================
+local INDENT = "    " -- 4 пробела
+
+btnIndent.MouseButton1Click:Connect(function()
+    local text = codeBox.Text
+    local cursor = codeBox.CursorPosition or 1
+    local beforeCursor = text:sub(1, cursor - 1)
+    local lineStart = beforeCursor:find("\n[^\n]*$") or 0
+    local lineStartPos = lineStart + 1
+    local newText = text:sub(1, lineStartPos - 1) .. INDENT .. text:sub(lineStartPos)
+    codeBox.Text = newText
+    codeBox.CursorPosition = cursor + #INDENT
+    updateHint()
+end)
+
+btnDedent.MouseButton1Click:Connect(function()
+    local text = codeBox.Text
+    local cursor = codeBox.CursorPosition or 1
+    local beforeCursor = text:sub(1, cursor - 1)
+    local lineStart = beforeCursor:find("\n[^\n]*$") or 0
+    local lineStartPos = lineStart + 1
+    local lineEnd = text:find("\n", lineStartPos) or (#text + 1)
+    local line = text:sub(lineStartPos, lineEnd - 1)
+    local leadingSpaces = line:match("^(%s*)")
+    if #leadingSpaces > 0 then
+        local removeCount = math.min(#INDENT, #leadingSpaces)
+        local newLine = line:sub(removeCount + 1)
+        local newText = text:sub(1, lineStartPos - 1) .. newLine .. text:sub(lineEnd)
+        codeBox.Text = newText
+        codeBox.CursorPosition = math.max(lineStartPos, cursor - removeCount)
+        updateHint()
     end
 end)
 
 -- ==========================================
--- ОБНОВЛЕНИЕ ВИЗУАЛА
+-- ОБНОВЛЕНИЕ ВИЗУАЛА (номера строк, размер)
 -- ==========================================
-
 local function updateEditorVisuals()
     local text = codeBox.Text
     local lines = {}
@@ -235,15 +292,13 @@ editorScroll:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
 end)
 
 -- ==========================================
--- КНОПКИ
+-- КНОПКИ EXECUTE / CLEAR / SELECT ALL / SAVE
 -- ==========================================
-
 btnExecute.MouseButton1Click:Connect(function()
     local success, err = pcall(function()
         local func = loadstring(codeBox.Text)
         if func then func() else error("Compilation error (empty code)") end
     end)
-    
     if not success then
         warn("[Xcode Error] " .. tostring(err))
     end
@@ -251,6 +306,7 @@ end)
 
 btnClear.MouseButton1Click:Connect(function() 
     codeBox.Text = ""
+    updateHint()
 end)
 
 btnSelectAll.MouseButton1Click:Connect(function()
@@ -273,7 +329,6 @@ end)
 -- ==========================================
 -- РЕСАЙЗ
 -- ==========================================
-
 local xResize = Instance.new("TextButton")
 xResize.Size = UDim2.new(0, 16, 0, 16)
 xResize.Position = UDim2.new(1, -16, 1, -16)
@@ -312,7 +367,6 @@ end)
 -- ==========================================
 -- СТАРТОВЫЙ КОД
 -- ==========================================
-
 codeBox.Text = [[local xcode = (100 - 99)
 if xcode == 1 then
     print("xcode test")
@@ -321,3 +375,4 @@ else
 end
 ]]
 updateEditorVisuals()
+updateHint()
