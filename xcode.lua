@@ -26,16 +26,16 @@ local Theme = {
     Dark = {
         bg = Color3.fromRGB(30, 30, 30), header = Color3.fromRGB(25, 25, 25),
         editorBg = Color3.fromRGB(20, 20, 20), outputBg = Color3.fromRGB(15, 15, 15),
-        text = Color3.fromRGB(200, 200, 200), lineNum = Color3.fromRGB(100, 100, 100),
-        btn = Color3.fromRGB(50, 50, 50), btnText = Color3.fromRGB(200, 200, 200),
+        text = Color3.fromRGB(220, 220, 220), lineNum = Color3.fromRGB(100, 100, 100),
+        btn = Color3.fromRGB(50, 50, 50), btnText = Color3.fromRGB(220, 220, 220),
         accent = Color3.fromRGB(255, 200, 100),
     },
     Light = {
-        bg = Color3.fromRGB(230, 230, 230), header = Color3.fromRGB(210, 210, 210),
-        editorBg = Color3.fromRGB(250, 250, 250), outputBg = Color3.fromRGB(240, 240, 240),
-        text = Color3.fromRGB(30, 30, 30), lineNum = Color3.fromRGB(120, 120, 120),
-        btn = Color3.fromRGB(180, 180, 180), btnText = Color3.fromRGB(30, 30, 30),
-        accent = Color3.fromRGB(200, 100, 0),
+        bg = Color3.fromRGB(210, 210, 210), header = Color3.fromRGB(190, 190, 190),
+        editorBg = Color3.fromRGB(235, 235, 235), outputBg = Color3.fromRGB(225, 225, 225),
+        text = Color3.fromRGB(20, 20, 20), lineNum = Color3.fromRGB(110, 110, 110),
+        btn = Color3.fromRGB(165, 165, 165), btnText = Color3.fromRGB(20, 20, 20),
+        accent = Color3.fromRGB(180, 90, 0),
     }
 }
 local CurrentTheme = "Dark"
@@ -43,7 +43,10 @@ local FontColor = nil
 local FontSize = 14
 
 local function T() return Theme[CurrentTheme] end
-local function fontColor() return FontColor or T().text end
+local function fontColor()
+    if FontColor then return FontColor end
+    return (CurrentTheme == "Dark") and Color3.fromRGB(220,220,220) or Color3.fromRGB(20,20,20)
+end
 
 -- ==========================================================
 -- ROOT
@@ -97,7 +100,6 @@ local function makeHeaderBtn(text, xOffset, width)
     return btn
 end
 
--- Кнопки справа налево
 local btnHelp      = makeHeaderBtn("Help",       -70,  54)
 local btnSettings  = makeHeaderBtn("Settings",   -132, 62)
 local btnEditor    = makeHeaderBtn("Editor",     -194, 58)
@@ -108,7 +110,7 @@ local btnClearOut  = makeHeaderBtn("Clear Out",  -506, 80)
 local btnExecute   = makeHeaderBtn("Execute",    -568, 54)
 
 -- ==========================================================
--- CONTENT AREA (вкладки живут здесь, одинаковый размер)
+-- CONTENT AREA
 -- ==========================================================
 local contentFrame = Instance.new("Frame")
 contentFrame.Size = UDim2.new(1, -20, 1, -84)
@@ -117,7 +119,7 @@ contentFrame.BackgroundTransparency = 1
 contentFrame.Parent = xWin
 
 -- ==========================================================
--- TAB: EDITOR (левая часть) + OUTPUT (правая) — внутри contentFrame
+-- TAB: EDITOR
 -- ==========================================================
 local tabEditor = Instance.new("Frame")
 tabEditor.Size = UDim2.new(1, 0, 1, 0)
@@ -230,13 +232,13 @@ local logConnection = LogService.MessageOut:Connect(function(message, messageTyp
     elseif messageType == Enum.MessageType.MessageWarning then
         color = Color3.fromRGB(255, 200, 100); prefix = "[WARN]"
     elseif messageType == Enum.MessageType.MessageInfo then
-        color = Color3.fromRGB(200, 200, 255); prefix = "[INFO]"
+        color = Color3.fromRGB(150, 150, 255); prefix = "[INFO]"
     end
     addOutput(prefix .. " " .. tostring(message), color)
 end)
 
 -- ==========================================================
--- TAB: SETTINGS (та же область)
+-- TAB: SETTINGS
 -- ==========================================================
 local tabSettings = Instance.new("Frame")
 tabSettings.Size = UDim2.new(1, 0, 1, 0)
@@ -284,6 +286,7 @@ end
 
 makeSettingBtn("Theme: Dark / Light", function()
     CurrentTheme = (CurrentTheme == "Dark") and "Light" or "Dark"
+    FontColor = nil -- авто-цвет под тему
     applyTheme()
 end)
 makeSettingBtn("Font color: White", function() FontColor = Color3.fromRGB(255,255,255); applyTheme() end)
@@ -352,7 +355,7 @@ makeSettingBtn("Load File (readfile)", function()
 end)
 
 -- ==========================================================
--- TAB: HELP (та же область, English)
+-- TAB: HELP
 -- ==========================================================
 local tabHelp = Instance.new("Frame")
 tabHelp.Size = UDim2.new(1, 0, 1, 0)
@@ -420,9 +423,14 @@ for _, pair in ipairs(helpData) do
 end
 
 -- ==========================================================
--- TAB SWITCHING
+-- TAB SWITCHING (toggle)
 -- ==========================================================
+local activeTab = "editor"
 local function showTab(name)
+    if activeTab == name and name ~= "editor" then
+        name = "editor" -- повторное нажатие возвращает в редактор
+    end
+    activeTab = name
     tabEditor.Visible = (name == "editor")
     tabSettings.Visible = (name == "settings")
     tabHelp.Visible = (name == "help")
@@ -433,7 +441,7 @@ btnSettings.MouseButton1Click:Connect(function() showTab("settings") end)
 btnHelp.MouseButton1Click:Connect(function() showTab("help") end)
 
 -- ==========================================================
--- HINT BAR (short labels)
+-- HINT BAR
 -- ==========================================================
 local hintBar = Instance.new("Frame")
 hintBar.Size = UDim2.new(1, -20, 0, 22)
@@ -531,7 +539,7 @@ function applyTheme()
         if lbl:IsA("TextLabel") then
             if lbl.Text:match("^%[ERR%]") then lbl.TextColor3 = Color3.fromRGB(255,100,100)
             elseif lbl.Text:match("^%[WARN%]") then lbl.TextColor3 = Color3.fromRGB(255,200,100)
-            elseif lbl.Text:match("^%[INFO%]") then lbl.TextColor3 = Color3.fromRGB(200,200,255)
+            elseif lbl.Text:match("^%[INFO%]") then lbl.TextColor3 = Color3.fromRGB(150,150,255)
             else lbl.TextColor3 = fontColor() end
         end
     end
@@ -618,7 +626,6 @@ else
     print("test2")
 end
 ]==]
--- даём layout'ам обновиться, затем ставим CanvasSize
 task.defer(function()
     settingsScroll.CanvasSize = UDim2.new(0, 0, 0, sLayout.AbsoluteContentSize.Y + 10)
     helpScroll.CanvasSize = UDim2.new(0, 0, 0, hLayout.AbsoluteContentSize.Y + 10)
