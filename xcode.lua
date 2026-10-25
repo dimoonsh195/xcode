@@ -206,5 +206,11 @@ UIS.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then xResizing = false end
 end)
 
-codeBox.Text = "print(1000-7)\n"
+codeBox.Text = [[local xcode = (100 - 99)
+if xcode == 1 then
+    print("xcode test")
+else
+    print("xcode test")
+end
+]]
 updateEditorVisuals()
