@@ -19,35 +19,6 @@ local guiParent = getGuiParent()
 if not guiParent then return end
 if guiParent:FindFirstChild("XcodeGui") then guiParent.XcodeGui:Destroy() end
 
--- ==========================================
--- ЭМУЛЯЦИЯ io.read
--- ==========================================
-local inputQueue = {}
-local waitingForInput = false
-local inputCallback = nil
-
-local fakeIo = {
-    read = function(fmt)
-        if not waitingForInput then
-            -- Если ввода нет — возвращаем nil (как в реальном io.read при EOF)
-            return nil
-        end
-        local value = inputQueue[1]
-        table.remove(inputQueue, 1)
-        if #inputQueue == 0 then
-            waitingForInput = false
-            if inputCallback then inputCallback() end
-        end
-        if fmt == "*n" then
-            return tonumber(value) or 0
-        end
-        return value
-    end
-}
-
--- ==========================================
--- GUI
--- ==========================================
 local xGui = Instance.new("ScreenGui")
 xGui.Name = "XcodeGui"
 xGui.ResetOnSpawn = false
@@ -56,8 +27,8 @@ xGui.DisplayOrder = 6000
 xGui.Parent = guiParent
 
 local xWin = Instance.new("Frame")
-xWin.Size = UDim2.new(0, 800, 0, 520)
-xWin.Position = UDim2.new(0.5, -400, 0.5, -260)
+xWin.Size = UDim2.new(0, 800, 0, 500)
+xWin.Position = UDim2.new(0.5, -400, 0.5, -250)
 xWin.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 xWin.BorderSizePixel = 0
 xWin.Active = true
@@ -65,46 +36,53 @@ xWin.Draggable = true
 xWin.Parent = xGui
 Instance.new("UICorner", xWin).CornerRadius = UDim.new(0, 6)
 
+-- ==========================================
+-- ШАПКА
+-- ==========================================
 local xHeader = Instance.new("Frame")
-xHeader.Size = UDim2.new(1, 0, 0, 30)
+xHeader.Size = UDim2.new(1, 0, 0, 32)
 xHeader.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 xHeader.Parent = xWin
 Instance.new("UICorner", xHeader).CornerRadius = UDim.new(0, 6)
 
 local xTitle = Instance.new("TextLabel")
-xTitle.Size = UDim2.new(0, 100, 1, 0)
+xTitle.Size = UDim2.new(0, 120, 1, 0)
 xTitle.Position = UDim2.new(0, 10, 0, 0)
 xTitle.BackgroundTransparency = 1
-xTitle.Text = "Xcode + Output"
+xTitle.Text = "Xcode"
 xTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
 xTitle.Font = Enum.Font.Code
 xTitle.TextSize = 14
 xTitle.TextXAlignment = Enum.TextXAlignment.Left
 xTitle.Parent = xHeader
 
-local function makeBtn(text, xOffset, width)
+-- Кнопки шапки: справа налево, с промежутками 8 px
+local function makeHeaderBtn(text, xOffset, width)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0, width, 0, 22)
-    btn.Position = UDim2.new(1, xOffset, 0, 4)
+    btn.Position = UDim2.new(1, xOffset, 0, 5)
     btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     btn.Text = text
     btn.TextColor3 = Color3.fromRGB(200, 200, 200)
     btn.Font = Enum.Font.Code
     btn.TextSize = 12
+    btn.BorderSizePixel = 0
     btn.Parent = xHeader
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
     return btn
 end
 
-local btnExecute = makeBtn("Execute", -240, 60)
-local btnClearOut = makeBtn("Clear Out", -170, 70)
-local btnClear = makeBtn("Clear Code", -90, 80)
-local btnSave = makeBtn("Save", -30, 50)
+local btnSave      = makeHeaderBtn("Save",       -62,  54)
+local btnClearCode = makeHeaderBtn("Clear Code", -150, 80)
+local btnClearOut  = makeHeaderBtn("Clear Out",  -238, 80)
+local btnExecute   = makeHeaderBtn("Execute",    -300, 54)
 
--- Левая часть — редактор
+-- ==========================================
+-- РЕДАКТОР (слева)
+-- ==========================================
 local editorContainer = Instance.new("Frame")
-editorContainer.Size = UDim2.new(0.6, -15, 1, -50)
-editorContainer.Position = UDim2.new(0, 10, 0, 35)
+editorContainer.Size = UDim2.new(0.6, -15, 1, -52)
+editorContainer.Position = UDim2.new(0, 10, 0, 37)
 editorContainer.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 editorContainer.BorderSizePixel = 0
 editorContainer.Parent = xWin
@@ -145,20 +123,22 @@ codeBox.MultiLine = true
 codeBox.TextWrapped = true
 codeBox.Parent = editorScroll
 
--- Правая часть — Output
+-- ==========================================
+-- OUTPUT (справа) — зеркало Roblox
+-- ==========================================
 local outputContainer = Instance.new("Frame")
-outputContainer.Size = UDim2.new(0.4, -15, 1, -50)
-outputContainer.Position = UDim2.new(0.6, 5, 0, 35)
+outputContainer.Size = UDim2.new(0.4, -15, 1, -52)
+outputContainer.Position = UDim2.new(0.6, 5, 0, 37)
 outputContainer.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 outputContainer.BorderSizePixel = 0
 outputContainer.Parent = xWin
 Instance.new("UICorner", outputContainer).CornerRadius = UDim.new(0, 4)
 
 local outputLabel = Instance.new("TextLabel")
-outputLabel.Size = UDim2.new(1, 0, 0, 20)
-outputLabel.Position = UDim2.new(0, 5, 0, 2)
+outputLabel.Size = UDim2.new(1, -10, 0, 18)
+outputLabel.Position = UDim2.new(0, 5, 0, 3)
 outputLabel.BackgroundTransparency = 1
-outputLabel.Text = "OUTPUT"
+outputLabel.Text = "OUTPUT (Roblox)"
 outputLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
 outputLabel.Font = Enum.Font.Code
 outputLabel.TextSize = 12
@@ -166,8 +146,8 @@ outputLabel.TextXAlignment = Enum.TextXAlignment.Left
 outputLabel.Parent = outputContainer
 
 local outputScroll = Instance.new("ScrollingFrame")
-outputScroll.Size = UDim2.new(1, -10, 1, -55)
-outputScroll.Position = UDim2.new(0, 5, 0, 22)
+outputScroll.Size = UDim2.new(1, -10, 1, -28)
+outputScroll.Position = UDim2.new(0, 5, 0, 23)
 outputScroll.BackgroundTransparency = 1
 outputScroll.BorderSizePixel = 0
 outputScroll.ScrollBarThickness = 6
@@ -179,28 +159,6 @@ local outputLayout = Instance.new("UIListLayout")
 outputLayout.SortOrder = Enum.SortOrder.LayoutOrder
 outputLayout.Padding = UDim.new(0, 2)
 outputLayout.Parent = outputScroll
-
--- Поле ввода для io.read
-local inputFrame = Instance.new("Frame")
-inputFrame.Size = UDim2.new(1, -10, 0, 28)
-inputFrame.Position = UDim2.new(0, 5, 1, -33)
-inputFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-inputFrame.BorderSizePixel = 0
-inputFrame.Parent = outputContainer
-Instance.new("UICorner", inputFrame).CornerRadius = UDim.new(0, 4)
-
-local inputBox = Instance.new("TextBox")
-inputBox.Size = UDim2.new(1, -10, 1, -6)
-inputBox.Position = UDim2.new(0, 5, 0, 3)
-inputBox.BackgroundTransparency = 1
-inputBox.PlaceholderText = "Ввод для io.read (Enter — отправить)..."
-inputBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 100)
-inputBox.TextColor3 = Color3.fromRGB(200, 255, 200)
-inputBox.Font = Enum.Font.Code
-inputBox.TextSize = 14
-inputBox.TextXAlignment = Enum.TextXAlignment.Left
-inputBox.ClearTextOnFocus = false
-inputBox.Parent = inputFrame
 
 local function addOutput(text, color)
     local label = Instance.new("TextLabel")
@@ -218,9 +176,11 @@ local function addOutput(text, color)
     outputScroll.CanvasPosition = Vector2.new(0, outputScroll.CanvasSize.Y.Offset)
 end
 
--- Подключение к LogService
 local logConnection = LogService.MessageOut:Connect(function(message, messageType)
-    if not outputScroll or not outputScroll.Parent then return end
+    if not outputScroll or not outputScroll.Parent then
+        if logConnection then logConnection:Disconnect() end
+        return
+    end
     local color = Color3.fromRGB(200, 200, 200)
     local prefix = "[OUT]"
     if messageType == Enum.MessageType.MessageError then
@@ -234,7 +194,7 @@ local logConnection = LogService.MessageOut:Connect(function(message, messageTyp
 end)
 
 -- ==========================================
--- ОБНОВЛЕНИЕ ВИЗУАЛА
+-- ВИЗУАЛ РЕДАКТОРА
 -- ==========================================
 local function updateEditorVisuals()
     local text = codeBox.Text
@@ -261,52 +221,20 @@ editorScroll:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
 end)
 
 -- ==========================================
--- ОТПРАВКА ВВОДА (Enter)
--- ==========================================
-inputBox.FocusLost:Connect(function(enterPressed)
-    if not enterPressed then return end
-    local val = inputBox.Text
-    if val == "" then return end
-    inputBox.Text = ""
-    addOutput("> " .. val, Color3.fromRGB(150, 255, 150))
-    table.insert(inputQueue, val)
-    waitingForInput = true
-end)
-
--- ==========================================
--- EXECUTE
+-- КНОПКИ
 -- ==========================================
 btnExecute.MouseButton1Click:Connect(function()
-    addOutput("--- Запуск скрипта ---", Color3.fromRGB(100, 200, 255))
-    inputQueue = {}
-    waitingForInput = false
-    
-    local env = setmetatable({}, {__index = _G})
-    env.io = fakeIo
-    env.print = function(...)
-        local parts = {}
-        for i = 1, select("#", ...) do
-            table.insert(parts, tostring(select(i, ...)))
-        end
-        local text = table.concat(parts, " ")
-        addOutput(text, Color3.fromRGB(200, 255, 200))
-    end
-    env.warn = function(...)
-        addOutput("[WARN] " .. table.concat({...}, " "), Color3.fromRGB(255, 200, 100))
-    end
-    
-    local func, err = loadstring(codeBox.Text, "XcodeScript")
-    if not func then
-        addOutput("Ошибка компиляции: " .. tostring(err), Color3.fromRGB(255, 100, 100))
-        return
-    end
-    
-    setfenv(func, env)
-    local success, execErr = pcall(func)
+    local success, err = pcall(function()
+        local func = loadstring(codeBox.Text)
+        if func then func() else error("Compilation error (empty code)") end
+    end)
     if not success then
-        addOutput("Ошибка выполнения: " .. tostring(execErr), Color3.fromRGB(255, 100, 100))
+        warn("[Xcode Error] " .. tostring(err))
     end
-    addOutput("--- Скрипт завершён ---", Color3.fromRGB(100, 200, 255))
+end)
+
+btnClearCode.MouseButton1Click:Connect(function()
+    codeBox.Text = ""
 end)
 
 btnClearOut.MouseButton1Click:Connect(function()
@@ -315,18 +243,18 @@ btnClearOut.MouseButton1Click:Connect(function()
     end
 end)
 
-btnClear.MouseButton1Click:Connect(function() codeBox.Text = "" end)
-
 btnSave.MouseButton1Click:Connect(function()
     if type(writefile) == "function" then
         local ok, err = pcall(function() writefile("Xcode_Script.lua", codeBox.Text) end)
-        if not ok then addOutput("Ошибка сохранения: " .. tostring(err), Color3.fromRGB(255, 100, 100)) end
+        if not ok then addOutput("Save error: " .. tostring(err), Color3.fromRGB(255, 100, 100)) end
     else
         addOutput("writefile недоступен", Color3.fromRGB(255, 100, 100))
     end
 end)
 
--- Ресайз
+-- ==========================================
+-- РЕСАЙЗ
+-- ==========================================
 local xResize = Instance.new("TextButton")
 xResize.Size = UDim2.new(0, 16, 0, 16)
 xResize.Position = UDim2.new(1, -16, 1, -16)
@@ -360,33 +288,17 @@ UIS.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then xResizing = false end
 end)
 
--- Стартовый код — твой калькулятор
-codeBox.Text = [==[
-print("Введите первое число: ")
-local a = io.read("*n")
-print("Введите второе число: ")
-local b = io.read("*n")
-print("Введите операцию (+, -, *, /): ")
-local op = io.read()
-
-local result
-if op == "+" then
-    result = a + b
-elseif op == "-" then
-    result = a - b
-elseif op == "*" then
-    result = a * b
-elseif op == "/" then
-    if b == 0 then
-        print("Ошибка: деление на ноль!")
-    else
-        result = a / b
-    end
+-- ==========================================
+-- СТАРТОВЫЙ КОД
+-- ==========================================
+codeBox.Text = [==[--- XCODE ---
+local a = 1
+if a == 1 then
+    print("test0")
+elseif a == 2 then
+    print("test1")
 else
-    print("Неизвестная операция")
-    return
+    print("test2")
 end
-
-print("Результат: " .. result)
 ]==]
 updateEditorVisuals()
