@@ -1,7 +1,7 @@
 -- ============================================================
 -- Xcode v. 1.0.5 — Templates + RU localization + XYIELD
 -- ============================================================
-local TextService = game:GetServiceA("TextService")
+local TextService = game:GetService("TextService")
 local UIS = game:GetService("UserInputService")
 local LogService = game:GetService("LogService")
 local LocalPlayer = game:GetService("Players").LocalPlayer
@@ -688,8 +688,7 @@ local logConnection = LogService.MessageOut:Connect(function(message, messageTyp
     end
     local color = fontColor()
     local prefix = "[OUT]"
-    if messageType == Enum.MessageType.MessageError then
-        color = Color3.fromRGB(255,100,100); prefix = "[ERR]"
+    if messageType == Enum.MessageType.MessageError then        color = Color3.fromRGB(255,100,100); prefix = "[ERR]"
     elseif messageType == Enum.MessageType.MessageWarning then
         color = Color3.fromRGB(255,200,100); prefix = "[WARN]"
     elseif messageType == Enum.MessageType.MessageInfo then
